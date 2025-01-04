@@ -96,13 +96,14 @@
     <div id="weather-info" class="weather-info"></div>
 
     <!-- 그래프 표시 공간 -->
-    <canvas id="weatherChart" width="400" height="400"></canvas>
+    <canvas id="weatherChart" width="300" height="300"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
     const apiKey = "6a81650010df570e0de88cf2505c1e8f"; // 제공된 API 키
+    let weatherChart = null; // 그래프를 저장할 변수
 
     function getWeather() {
         const city = document.getElementById('city').value;
@@ -111,10 +112,13 @@
             return;
         }
 
-        // OpenWeather API URL 생성
-        const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=kr`;
+        // OpenWeather API URL 생성 (날씨)
+        const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=kr`;
 
-        fetch(url)
+        // OpenWeather API URL 생성 (미세먼지)
+        const pollutionUrl = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${city.latitude}&lon=${city.longitude}&appid=${apiKey}`;
+
+        fetch(weatherUrl)
             .then(response => response.json())
             .then(data => {
                 if (data.cod === "404") {
@@ -122,66 +126,83 @@
                     return;
                 }
 
-                // 날씨 아이콘 URL
-                const icon = `http://openweathermap.org/img/wn/${data.weather[0].icon}.png`;
+                const lat = data.coord.lat;
+                const lon = data.coord.lon;
 
-                // 날씨 정보 표시
-                const weatherInfo = document.getElementById('weather-info');
-                weatherInfo.innerHTML = `
-                    <h3>${data.name} 날씨</h3>
-                    <img src="${icon}" alt="${data.weather[0].description}" />
-                    <p>기온: ${data.main.temp}°C</p>
-                    <p>상태: ${data.weather[0].description}</p>
-                    <p>최고 기온: ${data.main.temp_max}°C | 최저 기온: ${data.main.temp_min}°C</p>
-                    <p>습도: ${data.main.humidity}%</p>
-                    <p>풍속: ${data.wind.speed} m/s</p>
-                `;
+                // 미세먼지 정보 가져오기
+                fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`)
+                    .then(pollutionResponse => pollutionResponse.json())
+                    .then(pollutionData => {
+                        const aqi = pollutionData.list[0].main.aqi; // 미세먼지 지수 (Air Quality Index)
 
-                // 그래프 데이터 준비
-                const chartData = {
-                    labels: ['기온', '습도', '풍속'],
-                    datasets: [{
-                        label: '날씨 정보',
-                        data: [data.main.temp, data.main.humidity, data.wind.speed],
-                        backgroundColor: [
-                            'rgba(75, 192, 192, 0.7)', // 기온
-                            'rgba(255, 99, 132, 0.7)', // 습도
-                            'rgba(255, 159, 64, 0.7)', // 풍속
-                            'rgba(153, 102, 255, 0.7)', // 추가 색상 (옵션)
-                            'rgba(255, 205, 86, 0.7)'  // 추가 색상 (옵션)
-                        ],
-                        borderColor: [
-                            'rgba(75, 192, 192, 1)', // 기온
-                            'rgba(255, 99, 132, 1)', // 습도
-                            'rgba(255, 159, 64, 1)', // 풍속
-                            'rgba(153, 102, 255, 1)', // 추가 색상 (옵션)
-                            'rgba(255, 205, 86, 1)'  // 추가 색상 (옵션)
-                        ],
-                        borderWidth: 1
-                    }]
-                };
+                        // 날씨 아이콘 URL
+                        const icon = `http://openweathermap.org/img/wn/${data.weather[0].icon}.png`;
 
-                // Chart.js 원 그래프 생성
-                const ctx = document.getElementById('weatherChart').getContext('2d');
-                new Chart(ctx, {
-                    type: 'pie',  // 'pie'로 변경하여 원 그래프 사용
-                    data: chartData,
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(tooltipItem) {
-                                        return tooltipItem.label + ": " + tooltipItem.raw.toFixed(1);
+                        // 날씨 정보 표시
+                        const weatherInfo = document.getElementById('weather-info');
+                        weatherInfo.innerHTML = `
+                            <h3>${data.name} 날씨</h3>
+                            <img src="${icon}" alt="${data.weather[0].description}" />
+                            <p>기온: ${data.main.temp}°C</p>
+                            <p>상태: ${data.weather[0].description}</p>
+                            <p>최고 기온: ${data.main.temp_max}°C | 최저 기온: ${data.main.temp_min}°C</p>
+                            <p>습도: ${data.main.humidity}%</p>
+                            <p>풍속: ${data.wind.speed} m/s</p>
+                            <p>미세먼지 지수: ${aqi}</p> <!-- 미세먼지 정보 표시 -->
+                        `;
+
+                        // 그래프 데이터 준비
+                        const chartData = {
+                            labels: ['기온', '습도', '풍속', '미세먼지'],
+                            datasets: [{
+                                label: '날씨 정보',
+                                data: [data.main.temp, data.main.humidity, data.wind.speed, aqi],
+                                backgroundColor: [
+                                    'rgba(75, 192, 192, 0.7)', // 기온
+                                    'rgba(255, 99, 132, 0.7)', // 습도
+                                    'rgba(255, 159, 64, 0.7)', // 풍속
+                                    'rgba(153, 102, 255, 0.7)', // 미세먼지
+                                ],
+                                borderColor: [
+                                    'rgba(75, 192, 192, 1)', // 기온
+                                    'rgba(255, 99, 132, 1)', // 습도
+                                    'rgba(255, 159, 64, 1)', // 풍속
+                                    'rgba(153, 102, 255, 1)', // 미세먼지
+                                ],
+                                borderWidth: 1
+                            }]
+                        };
+
+                        // 기존의 그래프가 있다면 제거하고 새로 그리기
+                        if (weatherChart) {
+                            weatherChart.destroy();
+                        }
+
+                        // Chart.js 원 그래프 생성
+                        const ctx = document.getElementById('weatherChart').getContext('2d');
+                        weatherChart = new Chart(ctx, {
+                            type: 'pie',  // 'pie'로 변경하여 원 그래프 사용
+                            data: chartData,
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        position: 'top',
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(tooltipItem) {
+                                                return tooltipItem.label + ": " + tooltipItem.raw.toFixed(1);
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
-                });
+                        });
+                    })
+                    .catch(error => {
+                        console.error("미세먼지 정보를 가져오는 중 오류가 발생했습니다:", error);
+                    });
             })
             .catch(error => {
                 console.error("날씨 정보를 가져오는 중 오류가 발생했습니다:", error);
